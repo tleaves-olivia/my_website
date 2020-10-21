@@ -1,0 +1,140 @@
+---
+categories:
+- ""
+- ""
+date: "2020-10-20"
+description: ""
+draft: false
+keywords: ""
+slug: blog2
+title: "Trump’s Approval Margins"
+output: html_document
+---
+
+
+```{r, setup, echo=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE, 
+  warning = FALSE, 
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+options(digits = 3)
+
+# default figure size
+knitr::opts_chunk$set(
+  fig.width=6.75, 
+  fig.height=6.75,
+  fig.align = "center"
+)
+```
+
+
+```{r load-libraries, warning=FALSE, message=FALSE, echo=FALSE}
+library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
+library(mosaic)
+library(ggthemes)
+library(lubridate)
+library(fivethirtyeight)
+library(here)
+library(skimr)
+library(janitor)
+library(vroom)
+library(tidyquant)
+library(rvest)    # scrape websites
+library(purrr)  
+library(lubridate) # to handle dates
+library(scales) # for axis aesthetics 
+library(kableExtra) # extra customisation for kable tables
+library(RColorBrewer) # adds scaling color
+library(patchwork)
+```
+
+As we saw in class, fivethirtyeight.com has detailed data on all polls that track the president’s approval.
+```{r}
+# Import approval polls data
+approval_polllist <- read_csv(here::here('data', 'approval_polllist.csv'))
+
+# or directly off fivethirtyeight website
+# approval_polllist <- read_csv('https://projects.fivethirtyeight.com/trump-approval-data/approval_polllist.csv') 
+
+glimpse(approval_polllist)
+```
+
+# 1. Create a plot
+Let us calculate the average net approval rate (approve- disapprove) for each week since Trump got into office. We want to plot the net approval, along with its 95% confidence interval. There are various dates given for each poll, but we will use enddate, i.e., the date the poll ended.
+
+```{r}
+approval_analysis <- approval_polllist %>%
+  #We first filter so we only look at voters
+  filter(subgroup == "Voters") %>%              
+  # Converting enddate into the correct datatype
+  mutate(net_approval = approve - disapprove, 
+         enddate = as.Date(enddate, "%m/%d/%Y"),
+         year_a = year(enddate),   
+         week_a = week(enddate)) %>% 
+    # Let us clean up the data by only including relevant data
+  select(net_approval, year_a, week_a, enddate) %>%
+  # Now we find the data for confidence interval
+  group_by(year_a,week_a) %>%    
+  summarise(neta_avg = mean(net_approval, na.rm=TRUE),
+                    neta_sd = sd(net_approval, na.rm=TRUE),
+                    count = n(),
+                    neta_se = neta_sd/sqrt(count),
+                    margin_of_error = qt(0.975,count-1) * neta_se,
+                    neta_se_low = neta_avg - margin_of_error,
+                    neta_se_high = neta_avg + margin_of_error) 
+
+# now we plot the graph 
+ggplot(approval_analysis, aes(x = week_a,
+             y = neta_avg,
+             color = as.factor(year_a)))+
+    #create scatter plot and trendline
+    geom_point()+
+    geom_line()+
+    # we add the confidence interval as a ribbon around the line
+    geom_ribbon(aes(ymin = neta_se_low,
+                    ymax = neta_se_high,
+                    fill = as.factor(year_a)),
+                alpha = 0.1)+
+   # graphic changes
+   theme_bw()+
+   theme(legend.position = "none", 
+         axis.text.y = element_text(size = 7))+  
+   scale_x_continuous(breaks = c(0, 13, 26, 39, 52),
+                     limits = c(0, 53))+ 
+   scale_y_continuous(breaks = c(-20, -17.5, -15,-12.5, -10, -7.5, -5, -2.5, 0, 2.5, 5.0, 7.5))+ 
+ # we facet the graph and changes the values to match with picture. Color codes found by using a color picker from the internet on the graph
+  facet_wrap(~year_a)+
+  scale_colour_manual(values = c("#f8786f","#7cae00","#1ac5ca","#cc89ff"))+ 
+  # Adds horizontal line at 0
+   geom_hline(yintercept=0, 
+              color = "orange")+ 
+   labs( title = "Estimating Net Approval (approve-disaprrove) for Donald Trump",   
+        subtitle = "Weekly average of all polls",
+        x = "Week of the year",
+        y = "Average Net Approval (%)")
+```
+
+We have created the graph but found a small issue in the end of the year for the confidence interval of 2017 and 2018 where it gets very wide - we were however unable to figure that part out.
+
+# 2. Compare Confidence Intervals
+Let’s compare the confidence intervals for week 15 (6-12 April 2020) and week 34 (17-23 August 2020).
+
+```{r}
+# Let us first filter 
+approval_analysis_wk <- approval_analysis %>% 
+  filter(year_a == 2020,
+         week_a == c(15, 34)) %>%
+  kable(caption = "TABLE 3.1: Confidence interval for net approval rating in week 15 and 34 in 2020",
+             col.names = c("Year", "Week", "Average net approval rating", "Standard deviation", "Observations", "Standard error", "Margin of error", "Lower CI", "Upper CI")) %>% 
+  kable_classic("striped")
+
+approval_analysis_wk
+```
+
+Although we could plot this data, it is actually easier to see with a table. As we can see the CI is much wider for week 34 relative to week 15 - this mainly comes from higher standard deviation for week 34, which means that there is higher variance in results of these polls. Our view is that there are two main reasons for this increase: 
+
+(1) elections in the United States are about to happen, as the year progresses - more and more independent voters are swayed towards either of Republican and Democratic sides. 
+
+(2) Handling of the coronavirus pandemic in the US has created strong positive and negative views of the administration. The impact of the pandemic is strong enough to sway either party’s loyal followers. These two factors combined are creating higher volatility in the approval ratings.
+

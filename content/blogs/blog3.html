@@ -1,0 +1,627 @@
+---
+categories:
+- ""
+- ""
+date: "2020-10-20"
+description: ""
+draft: false
+image: pic10.jpg
+keywords: ""
+slug: blog3
+title: "Omega Group plc- Pay Discrimination"
+output: html_document
+---
+
+<script src="/rmarkdown-libs/kePrint/kePrint.js"></script>
+<link href="/rmarkdown-libs/lightable/lightable.css" rel="stylesheet" />
+
+
+<p>At the last board meeting of Omega Group Plc., the headquarters of a large multinational company, the issue was raised that women were being discriminated in the company, in the sense that the salaries were not the same for male and female executives. A quick analysis of a sample of 50 employees (of which 24 men and 26 women) revealed that the average salary for men was about 8,700 higher than for women. This seemed like a considerable difference, so it was decided that a further analysis of the company salaries was warranted.</p>
+<p>We will now carry out the analysis with the objective of finding out whether there is a significant difference between the salaries of men and women, and whether the difference is due to discrimination or whether it is based on another, possibly valid, determining factor.</p>
+<div id="loading-the-data" class="section level1">
+<h1>1. Loading the data</h1>
+<pre class="r"><code>omega &lt;- read_csv(here::here(&quot;data&quot;, &quot;omega.csv&quot;))
+glimpse(omega) # examine the data frame</code></pre>
+<pre><code>## Rows: 50
+## Columns: 3
+## $ salary     &lt;dbl&gt; 81894, 69517, 68589, 74881, 65598, 76840, 78800, 70033, ...
+## $ gender     &lt;chr&gt; &quot;male&quot;, &quot;male&quot;, &quot;male&quot;, &quot;male&quot;, &quot;male&quot;, &quot;male&quot;, &quot;male&quot;, ...
+## $ experience &lt;dbl&gt; 16, 25, 15, 33, 16, 19, 32, 34, 1, 44, 7, 14, 33, 19, 24...</code></pre>
+</div>
+<div id="relationship-salary---gender" class="section level1">
+<h1>2. Relationship Salary - Gender?</h1>
+<p>The data frame omega contains the salaries for the sample of 50 executives in the company. We will try to conclude whether there is a significant difference between the salaries of the male and female executives.</p>
+<p>There are several ways to test for this including the below four:</p>
+<ul>
+<li>Confidence intervals</li>
+<li>Hypothesis testing . Correlation analysis . Regression</li>
+</ul>
+<p>Let us start by defining our null and alternative hypothesis:</p>
+<ul>
+<li>Null hypothesis: Gender and salary are independent</li>
+<li>Alternative hypothesis: Gender and salary are not independent</li>
+</ul>
+<p>Let us now start out by looking at the confidence intervals by gender. We will first look at the summary statistics and then calculate our confidence intervals.</p>
+<pre class="r"><code># Summary Statistics of salary by gender
+mosaic::favstats (salary ~ gender, data=omega) %&gt;%
+  #Fixes table
+  kable(caption = &quot;TABLE 3.1: Summary statistics&quot;,
+             col.names = c(&quot;Gender&quot;, &quot;Minimum&quot;, &quot;Lower quartile&quot;, &quot;Median&quot;, &quot;Upper quartile&quot;,&quot;Maximum&quot;,&quot;Mean&quot;, &quot;Standard deviation&quot;, &quot;Observations&quot;, &quot;Missing data&quot;),
+        #Fixes number of decimal points
+        digits = 0,
+        # Adds thousand decimals seperator
+        format.args = list(big.mark = &quot;,&quot;, scientific = FALSE)) %&gt;% 
+  kable_classic(&quot;striped&quot;, full_width = FALSE)</code></pre>
+<table class=" lightable-classic lightable-striped" style='font-family: "Arial Narrow", "Source Sans Pro", sans-serif; width: auto !important; margin-left: auto; margin-right: auto;'>
+<caption>
+(#tab:confint_single_valiables)TABLE 3.1: Summary statistics
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+Gender
+</th>
+<th style="text-align:right;">
+Minimum
+</th>
+<th style="text-align:right;">
+Lower quartile
+</th>
+<th style="text-align:right;">
+Median
+</th>
+<th style="text-align:right;">
+Upper quartile
+</th>
+<th style="text-align:right;">
+Maximum
+</th>
+<th style="text-align:right;">
+Mean
+</th>
+<th style="text-align:right;">
+Standard deviation
+</th>
+<th style="text-align:right;">
+Observations
+</th>
+<th style="text-align:right;">
+Missing data
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+female
+</td>
+<td style="text-align:right;">
+47,033
+</td>
+<td style="text-align:right;">
+60,338
+</td>
+<td style="text-align:right;">
+64,618
+</td>
+<td style="text-align:right;">
+70,033
+</td>
+<td style="text-align:right;">
+78,800
+</td>
+<td style="text-align:right;">
+64,543
+</td>
+<td style="text-align:right;">
+7,567
+</td>
+<td style="text-align:right;">
+26
+</td>
+<td style="text-align:right;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+male
+</td>
+<td style="text-align:right;">
+54,768
+</td>
+<td style="text-align:right;">
+68,331
+</td>
+<td style="text-align:right;">
+74,675
+</td>
+<td style="text-align:right;">
+78,568
+</td>
+<td style="text-align:right;">
+84,576
+</td>
+<td style="text-align:right;">
+73,239
+</td>
+<td style="text-align:right;">
+7,463
+</td>
+<td style="text-align:right;">
+24
+</td>
+<td style="text-align:right;">
+0
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code># Dataframe with two rows (male-female) and having as columns gender, mean, SD, sample size, the t-critical value, the standard error, the margin of error, and the low/high endpoints of a 95% condifence interval
+omega_sum &lt;- omega %&gt;% 
+  #Groups by gender
+  group_by(gender) %&gt;% 
+  # Calculates the values listed above
+  summarize(
+    mean_salary = mean(salary),
+    sd_salary = sd(salary),
+    sample_size = n(),
+    t_critical = qt(0.975, sample_size - 1),
+    SE = sd_salary/sqrt(sample_size),
+    margin_of_error = t_critical * SE,
+    low_CI = mean_salary - margin_of_error,
+    high_CI = mean_salary + margin_of_error
+  ) %&gt;% 
+  #Fixes aesthetics
+  kable(caption = &quot;TABLE 3.2: Confidence intervals and related values&quot;,
+             col.names = c(&quot;Gender&quot;, &quot;Mean&quot;, &quot;Standard deviation&quot;, &quot;Observations&quot;, &quot;Critical t-value&quot;, &quot;Standard error&quot;, &quot;Margin of error&quot;, &quot;Lower CI&quot;, &quot;Upper CI&quot;),
+        #Fixes number of decimal points     
+        digits = 0,
+        # Adds thousand decimals and does not include scientific notation     
+        format.args = list(big.mark = &quot;,&quot;, scientific = FALSE)) %&gt;%  
+  kable_classic(&quot;striped&quot;, full_width = FALSE)
+
+omega_sum</code></pre>
+<table class=" lightable-classic lightable-striped" style='font-family: "Arial Narrow", "Source Sans Pro", sans-serif; width: auto !important; margin-left: auto; margin-right: auto;'>
+<caption>
+<span id="tab:unnamed-chunk-1">Table 1: </span>TABLE 3.2: Confidence intervals and related values
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+Gender
+</th>
+<th style="text-align:right;">
+Mean
+</th>
+<th style="text-align:right;">
+Standard deviation
+</th>
+<th style="text-align:right;">
+Observations
+</th>
+<th style="text-align:right;">
+Critical t-value
+</th>
+<th style="text-align:right;">
+Standard error
+</th>
+<th style="text-align:right;">
+Margin of error
+</th>
+<th style="text-align:right;">
+Lower CI
+</th>
+<th style="text-align:right;">
+Upper CI
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+female
+</td>
+<td style="text-align:right;">
+64,543
+</td>
+<td style="text-align:right;">
+7,567
+</td>
+<td style="text-align:right;">
+26
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+1,484
+</td>
+<td style="text-align:right;">
+3,056
+</td>
+<td style="text-align:right;">
+61,486
+</td>
+<td style="text-align:right;">
+67,599
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+male
+</td>
+<td style="text-align:right;">
+73,239
+</td>
+<td style="text-align:right;">
+7,463
+</td>
+<td style="text-align:right;">
+24
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+1,523
+</td>
+<td style="text-align:right;">
+3,151
+</td>
+<td style="text-align:right;">
+70,088
+</td>
+<td style="text-align:right;">
+76,390
+</td>
+</tr>
+</tbody>
+</table>
+<p>There is no overlap between the confidence intervals of salaries of both gender, which indicates that under the 95% confidence level, we can reach a conclusion that the two gender’s salaries do not have the same average.</p>
+<p>Next, let us run a hypothesis testing, assuming as a null hypothesis that the mean difference in salaries is zero, or that, on average, men and women make the same amount of money.</p>
+<pre class="r"><code># hypothesis testing using t.test() 
+omega_ttest &lt;- omega 
+
+t.test(salary ~ gender, 
+       data = omega_ttest, 
+       alternative = &quot;two.sided&quot;)</code></pre>
+<pre><code>## 
+##  Welch Two Sample t-test
+## 
+## data:  salary by gender
+## t = -4, df = 48, p-value = 2e-04
+## alternative hypothesis: true difference in means is not equal to 0
+## 95 percent confidence interval:
+##  -12973  -4420
+## sample estimates:
+## mean in group female   mean in group male 
+##                64543                73239</code></pre>
+<pre class="r"><code># hypothesis testing using infer package. First we find the observed differences in mean.
+observed_difference &lt;- omega %&gt;% 
+  #We want to see the relationship between gender and salary
+  specify(salary ~ gender) %&gt;% 
+  #We calculate the observed difference
+  calculate(stat = &quot;diff in means&quot;) 
+
+#Now we generate how a distribution would look if the two variables were independent. we first set the seed
+set.seed(1234)
+omega_ttest_infer &lt;- omega %&gt;% 
+  #Salary and gender is relationship we are looking at
+  specify(salary ~ gender) %&gt;% 
+  #We assume independence
+  hypothesize(null = &quot;independence&quot;) %&gt;% 
+  #We have 1000 repetitions
+  generate(reps = 1000, type = &quot;permute&quot;) %&gt;% 
+  # Generating the null distribution (there is no significant difference in the means of the salaries of both genders)
+  calculate(stat = &quot;diff in means&quot;, order = c(&quot;male&quot;, &quot;female&quot;)) 
+
+# Visualizing the observed statistic alongside the null distribution
+visualize(omega_ttest_infer)+ 
+  shade_p_value(obs_stat = observed_difference, direction = &quot;two sided&quot;)</code></pre>
+<p><img src="/blogs/blog3_files/figure-html/hypothesis_testing_using_infer_package-1.png" width="648" style="display: block; margin: auto;" /></p>
+<pre class="r"><code># calculate p value
+omega_ttest_infer %&gt;% 
+  get_p_value(obs_stat = observed_difference, direction = &quot;two sided&quot;) </code></pre>
+<pre><code>## # A tibble: 1 x 1
+##   p_value
+##     &lt;dbl&gt;
+## 1       0</code></pre>
+<p>The p-values from both methods are very low - far below our 2.5% cut-off rate (for a two-sided test). This means we can reject the null hypothesis that there is no significant difference in the means of the salaries of both genders. Thereby we reach the same conclusion as earlier.</p>
+</div>
+<div id="relationship-experience---gender" class="section level1">
+<h1>3. Relationship Experience - Gender?</h1>
+<p>At the board meeting, someone raised the issue that there was indeed a substantial difference between male and female salaries, but that this was attributable to other reasons such as differences in experience. A questionnaire send out to the 50 executives in the sample reveals that the average experience of the men is approximately 21 years, whereas the women only have about 7 years experience on average (see table below).</p>
+<pre class="r"><code># Summary Statistics of salary by gender
+favstats (experience ~ gender, data=omega) %&gt;% 
+  kable(caption = &quot;TABLE 3.3: Summary statistics for number of years per gender&quot;,
+             col.names = c(&quot;Gender&quot;, &quot;Minimum&quot;, &quot;Lower quartile&quot;, &quot;Median&quot;, &quot;Upper quartile&quot;,&quot;Maximum&quot;,&quot;Mean&quot;, &quot;Standard deviation&quot;, &quot;Observations&quot;, &quot;Missing data&quot;),
+        #Fixes number of decimal points     
+        digits = 0,
+        # Adds thousand decimals and does not include scientific notation     
+        format.args = list(big.mark = &quot;,&quot;, scientific = FALSE)) %&gt;%  
+  kable_classic(&quot;striped&quot;, full_width = FALSE)</code></pre>
+<table class=" lightable-classic lightable-striped" style='font-family: "Arial Narrow", "Source Sans Pro", sans-serif; width: auto !important; margin-left: auto; margin-right: auto;'>
+<caption>
+(#tab:experience_stats)TABLE 3.3: Summary statistics for number of years per gender
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+Gender
+</th>
+<th style="text-align:right;">
+Minimum
+</th>
+<th style="text-align:right;">
+Lower quartile
+</th>
+<th style="text-align:right;">
+Median
+</th>
+<th style="text-align:right;">
+Upper quartile
+</th>
+<th style="text-align:right;">
+Maximum
+</th>
+<th style="text-align:right;">
+Mean
+</th>
+<th style="text-align:right;">
+Standard deviation
+</th>
+<th style="text-align:right;">
+Observations
+</th>
+<th style="text-align:right;">
+Missing data
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+female
+</td>
+<td style="text-align:right;">
+0
+</td>
+<td style="text-align:right;">
+0
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+14
+</td>
+<td style="text-align:right;">
+29
+</td>
+<td style="text-align:right;">
+7
+</td>
+<td style="text-align:right;">
+9
+</td>
+<td style="text-align:right;">
+26
+</td>
+<td style="text-align:right;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+male
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+16
+</td>
+<td style="text-align:right;">
+20
+</td>
+<td style="text-align:right;">
+31
+</td>
+<td style="text-align:right;">
+44
+</td>
+<td style="text-align:right;">
+21
+</td>
+<td style="text-align:right;">
+11
+</td>
+<td style="text-align:right;">
+24
+</td>
+<td style="text-align:right;">
+0
+</td>
+</tr>
+</tbody>
+</table>
+<p>Let us quickly perform a similar analysis to what we did with the other relationship. First let us find confidence intervals.</p>
+<pre class="r"><code>omega %&gt;% 
+  #Groups by gender
+  group_by(gender) %&gt;% 
+  # Calculates the values listed above
+  summarize(
+    mean_salary = mean(experience),
+    sd_salary = sd(experience),
+    sample_size = n(),
+    t_critical = qt(0.975, sample_size - 1),
+    SE = sd_salary/sqrt(sample_size),
+    margin_of_error = t_critical * SE,
+    low_CI = mean_salary - margin_of_error,
+    high_CI = mean_salary + margin_of_error
+  ) %&gt;% 
+  #Fixes aesthetics
+  kable(caption = &quot;TABLE 3.4: Confidence intervals and related values for experience&quot;,
+             col.names = c(&quot;Gender&quot;, &quot;Mean&quot;, &quot;Standard deviation&quot;, &quot;Observations&quot;, &quot;Critical t-value&quot;, &quot;Standard error&quot;, &quot;Margin of error&quot;, &quot;Lower CI&quot;, &quot;Upper CI&quot;),
+        #Fixes number of decimal points     
+        digits = 1,
+        # Adds thousand decimals and does not include scientific notation     
+        format.args = list(big.mark = &quot;,&quot;, scientific = FALSE)) %&gt;%  
+  kable_classic(&quot;striped&quot;, full_width = FALSE)</code></pre>
+<table class=" lightable-classic lightable-striped" style='font-family: "Arial Narrow", "Source Sans Pro", sans-serif; width: auto !important; margin-left: auto; margin-right: auto;'>
+<caption>
+<span id="tab:unnamed-chunk-2">Table 2: </span>TABLE 3.4: Confidence intervals and related values for experience
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+Gender
+</th>
+<th style="text-align:right;">
+Mean
+</th>
+<th style="text-align:right;">
+Standard deviation
+</th>
+<th style="text-align:right;">
+Observations
+</th>
+<th style="text-align:right;">
+Critical t-value
+</th>
+<th style="text-align:right;">
+Standard error
+</th>
+<th style="text-align:right;">
+Margin of error
+</th>
+<th style="text-align:right;">
+Lower CI
+</th>
+<th style="text-align:right;">
+Upper CI
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+female
+</td>
+<td style="text-align:right;">
+7.4
+</td>
+<td style="text-align:right;">
+8.5
+</td>
+<td style="text-align:right;">
+26
+</td>
+<td style="text-align:right;">
+2.1
+</td>
+<td style="text-align:right;">
+1.7
+</td>
+<td style="text-align:right;">
+3.4
+</td>
+<td style="text-align:right;">
+3.9
+</td>
+<td style="text-align:right;">
+10.8
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+male
+</td>
+<td style="text-align:right;">
+21.1
+</td>
+<td style="text-align:right;">
+10.9
+</td>
+<td style="text-align:right;">
+24
+</td>
+<td style="text-align:right;">
+2.1
+</td>
+<td style="text-align:right;">
+2.2
+</td>
+<td style="text-align:right;">
+4.6
+</td>
+<td style="text-align:right;">
+16.5
+</td>
+<td style="text-align:right;">
+25.7
+</td>
+</tr>
+</tbody>
+</table>
+<p>Next let us use the infer package to find our p-value</p>
+<pre class="r"><code># hypothesis testing using infer package. First we find the observed differences in mean.
+observed_difference_2 &lt;- omega %&gt;% 
+  #We want to see the relationship between gender and salary
+  specify(experience ~ gender) %&gt;% 
+  #We calculate the observed difference
+  calculate(stat = &quot;diff in means&quot;) 
+
+#Now we generate how a distribution would look if the two variables were independent. we first set the seed
+set.seed(12345)
+omega_ttest_infer_2 &lt;- omega %&gt;% 
+  #Salary and gender is relationship we are looking at
+  specify(experience ~ gender) %&gt;% 
+  #We assume independence
+  hypothesize(null = &quot;independence&quot;) %&gt;% 
+  #We have 1000 repetitions
+  generate(reps = 1000, type = &quot;permute&quot;) %&gt;% 
+  # Generating the null distribution (there is no significant difference in the means of the salaries of both genders)
+  calculate(stat = &quot;diff in means&quot;, order = c(&quot;male&quot;, &quot;female&quot;)) 
+
+# Visualizing the observed statistic alongside the null distribution
+visualize(omega_ttest_infer_2)+ 
+  shade_p_value(obs_stat = observed_difference_2, direction = &quot;two sided&quot;)</code></pre>
+<p><img src="/blogs/blog3_files/figure-html/unnamed-chunk-3-1.png" width="648" style="display: block; margin: auto;" /></p>
+<pre class="r"><code># calculate p value
+omega_ttest_infer_2 %&gt;% 
+  get_p_value(obs_stat = observed_difference_2, direction = &quot;two sided&quot;) </code></pre>
+<pre><code>## # A tibble: 1 x 1
+##   p_value
+##     &lt;dbl&gt;
+## 1   0.002</code></pre>
+<p>For both of these analyses, we see that there is significance (confidence intervals do not overlap and p-value is less than 2.5%). This means that there is a significant difference between the length of women and men’s experience (given our confidence level). This could therefore be a lurking variable, which would mean the conclusion we reached earlier on the relationship between gender and salary may not be casual.</p>
+</div>
+<div id="relationship-salary---experience" class="section level1">
+<h1>4. Relationship Salary - Experience ?</h1>
+<p>Someone at the meeting argues that clearly, a more thorough analysis of the relationship between salary and experience is required before any conclusion can be drawn about whether there is any gender-based salary discrimination in the company.</p>
+<p>Let us analyse the relationship between salary and experience.</p>
+<pre class="r"><code>ggplot(omega, aes(x = salary, 
+                  y = experience, 
+                  color = gender)) +
+  geom_point() +
+  geom_smooth(method = &quot;lm&quot;) +
+  labs(title = &quot;Relationship between salary and experience&quot;,
+       subtitle = &quot;&quot;,
+       x = &quot;Salary&quot;,
+       y = &quot;Work experience (years)&quot;)+
+  theme_bw()</code></pre>
+<p><img src="/blogs/blog3_files/figure-html/salary_exp_scatter-1.png" width="648" style="display: block; margin: auto;" /></p>
+<p>We can draw a couple of conclusions. Firstly, we see that generally men do earn more than women in the dataset (we already knew this). Secondly, we that on average, men are more experienced than women (we also knew this). The main interesting thing with the plot is that the slope of the two regression lines look very similar (particularly considering the confidence interval around the line). This implies that that as men and women gain seniority, they generally would see an equal increase in salary. Again this weakens our initial worry that gender is causal in determining salary.</p>
+</div>
+<div id="check-correlations-between-the-data" class="section level1">
+<h1>5. Check correlations between the data</h1>
+<p>We can use GGally:ggpairs() to create a scatterplot and correlation matrix. Essentially, we change the order our variables will appear in and have the dependent variable (Y), salary, as last in our list. We then pipe the dataframe to ggpairs() with aes arguments to colour by gender and make ths plots somewhat transparent (alpha = 0.3).</p>
+<pre class="r"><code>omega %&gt;% 
+  select(gender, experience, salary) %&gt;% #order variables they will appear in ggpairs()
+  ggpairs(aes(colour=gender, alpha = 0.3))+
+  theme_bw()</code></pre>
+<p><img src="/blogs/blog3_files/figure-html/ggpairs-1.png" width="648" style="display: block; margin: auto;" /></p>
+<p>For both males and females, salaries and experience are positively correlated and judged from the correlation coefficient we can see that the correlation between salaries and experience is higher for female compared with male. Part of the reason that female in the company have relatively lower average salaries is that female in the company have relatively less experience (there are 7/26 samples with no expereince in women vs 1/24 in men, and 7/24 male samples have 30+ years of experience while no female have).</p>
+</div>

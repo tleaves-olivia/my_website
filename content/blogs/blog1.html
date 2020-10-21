@@ -1,0 +1,111 @@
+---
+categories:
+- ""
+- ""
+date: "2020-10-20"
+description: ""
+draft: false
+keywords: ""
+slug: blog1
+title: "COVID-19 Data Insights"
+output: html_document
+---
+
+
+
+<p>Let us look at CDC Covid-19 Case Surveillance Data. There are well over 3 million entries of individual, de-identified patient data.</p>
+<pre class="r"><code># URL link to CDC to download data
+url &lt;- &quot;https://data.cdc.gov/api/views/vbim-akqf/rows.csv?accessType=DOWNLOAD&quot;
+
+covid_data &lt;- vroom(url)%&gt;%
+  clean_names()
+
+# covid_data &lt;- read_csv(here::here(&#39;data&#39;, &#39;COVID-19_Case_Surveillance_Public_Use_Data.csv.zip&#39;)) %&gt;% 
+#   clean_names()</code></pre>
+<p>Given the data we have, I would produce two graphs that show death % rate:</p>
+<div id="by-age-group-sex-and-whether-the-patient-had-co-morbidities-or-not" class="section level2">
+<h2>1. by age group, sex, and whether the patient had co-morbidities or not</h2>
+<pre class="r"><code>covid_chart_one &lt;- covid_data %&gt;% 
+  # Manually delete data with values that are &quot;Missing&quot;, &quot;Unknown&quot; as well as &quot;Other&quot; for gender
+  filter(sex != &quot;Missing&quot; &amp;
+           sex != &quot;Unknown&quot; &amp;
+           sex != &quot;Other&quot; &amp;
+           age_group != &quot;Missing&quot; &amp;
+           age_group != &quot;Unknown&quot; &amp;
+           medcond_yn != &quot;Missing&quot; &amp;
+           medcond_yn != &quot;Unknown&quot; &amp;
+           death_yn != &quot;Missing&quot; &amp;
+           death_yn != &quot;Unknown&quot;) %&gt;% 
+  group_by(sex, medcond_yn, age_group) %&gt;% 
+  summarize(death_rate = count(death_yn == &quot;Yes&quot;)/n()*100, .group = &quot;keep&quot;) %&gt;% 
+  mutate(medcond_yn = as.factor(medcond_yn)) # Calculation of death_rate 
+# We will reorder the medical condition for when we facet the chart later
+covid_chart_one$medcond_yn &lt;- relevel(covid_chart_one$medcond_yn, &quot;Yes&quot;, &quot;No&quot;)
+
+new_labels1 &lt;- c(&quot;No&quot; = &quot;Without comorbidities&quot;, &quot;Yes&quot; = &quot;With Comorbidities&quot;) # build a new vector to change strip label
+
+  
+ggplot(covid_chart_one, aes(x = age_group, 
+                            y = death_rate))+
+  geom_col(fill = &quot;#6879a1&quot;)+
+  # add data label
+  geom_text(aes(label = round(death_rate, 1)), 
+            hjust = 0, 
+            size = 2.5)+ 
+  coord_flip()+
+  # Fixes scale and format of numbers of y axis
+  scale_y_continuous(labels = function(death_rate)paste0(death_rate, &quot;%&quot;), 
+                    breaks = seq(0, 60, 20),
+                    limits = c(0, 70))+ # set axis limits and change breaks
+  theme_bw()+
+  theme(axis.title = element_blank(), # delete axis title
+        text = element_text(size = 8))+ # Change text size
+  labs(title = &quot;Covid death % by age group, sex, and presence of co-morbidities&quot;,
+       caption = &quot;Source: CDC&quot;)+
+  facet_grid(medcond_yn ~ sex, labeller = labeller(medcond_yn = new_labels1)) # create faceted chart and rename strip name</code></pre>
+<p><img src="/blogs/blog1_files/figure-html/unnamed-chunk-2-1.png" width="648" style="display: block; margin: auto;" /></p>
+</div>
+<div id="by-age-group-sex-and-whether-the-patient-was-admited-to-intensive-care-unit-icu-or-not." class="section level2">
+<h2>2. by age group, sex, and whether the patient was admited to Intensive Care Unit (ICU) or not.</h2>
+<pre class="r"><code>covid_chart2 &lt;- covid_data%&gt;% 
+  # Manually delete data with values that are &quot;Missing&quot;, &quot;Unknown&quot; as well as &quot;Other&quot; for gender
+  filter(sex != &quot;Missing&quot; &amp;
+           sex != &quot;Unknown&quot; &amp;
+           sex != &quot;Other&quot; &amp;
+           age_group != &quot;Missing&quot; &amp;
+           age_group != &quot;Unknown&quot; &amp;
+           medcond_yn != &quot;Missing&quot; &amp;
+           medcond_yn != &quot;Unknown&quot; &amp;
+           icu_yn != &quot;Missing&quot; &amp;
+           icu_yn != &quot;Unknown&quot;) %&gt;% 
+  group_by(sex, icu_yn, age_group) %&gt;% 
+  summarize(death_rate = count(death_yn == &quot;Yes&quot;)/n()*100,  .group = &quot;keep&quot;) %&gt;% # Calculation of death_rate 
+  mutate(icu_yn = as.factor(icu_yn))
+
+# We will reorder the ICU column for when we facet the chart later
+covid_chart2$icu_yn &lt;- relevel(covid_chart2$icu_yn, &quot;Yes&quot;, &quot;No&quot;)
+
+# create a new vector to change strip label
+new_labels2 &lt;- c(&quot;No&quot; = &quot;No ICU&quot;, &quot;Yes&quot; = &quot;Admitted to ICU&quot;) 
+
+  
+ggplot(covid_chart2, aes(x = age_group, 
+                         y = death_rate))+
+  geom_col(fill = &quot;#ff9582&quot;)+
+  geom_text(aes(label=round(death_rate, 1)), # add data label
+            hjust = 0, # change label position
+            size = 2.5)+ # change label font size 
+  coord_flip()+
+  scale_y_continuous(labels = function(death_rate)paste0(death_rate, &quot;%&quot;), # change axis labels to percent format
+                     breaks = seq(0, 80, 20),
+                     limits = c(0, 85))+ # set axis limits and change breaks
+  theme_bw()+
+  theme(axis.title = element_blank(), # delete axis title
+        text = element_text(size = 8), # Change text size
+        
+        )+
+  labs(title = &quot;Covid death % by age group, sex, and whether patient was admitted to ICU&quot;,
+       caption = &quot;Source: CDC&quot;)+
+  facet_grid(icu_yn ~ sex, labeller = labeller(icu_yn = new_labels2)) # create faceted chart and rename strip name</code></pre>
+<p><img src="/blogs/blog1_files/figure-html/unnamed-chunk-3-1.png" width="648" style="display: block; margin: auto;" /></p>
+</div>
